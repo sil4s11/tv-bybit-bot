@@ -1,0 +1,24 @@
+{
+  "name": "bybit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bull": "^3.13.0",
+    "ccxt-bybit": "^1.0.0",
+    "chalk": "^3.0.0",
+    "crypto": "^1.0.1",
+    "dotenv": "^8.2.0",
+    "hapi": "^18.1.0",
+    "node-telegram-bot-api": "^0.40.0",
+    "redis": "^3.0.2",
+    "request-promise": "^4.2.5",
+    "sha256": "^0.2.0"
+  }
+}
