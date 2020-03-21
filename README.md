@@ -21,8 +21,9 @@ It works with a volatility indicator to avoid choppiness, a confirmation indicat
 
 The description for the volatility indicator would be
 
-**{"side": "",  "canTrade": false, "key": "xxxxxxxxxxxxx"}
-{"side": "",  "canTrade": true, "key": "xxxxxxxxxxxxx"}**
+**{"side": "",  "canTrade": false, "key": "xxxxxxxxxxxxx"}**
+
+**{"side": "",  "canTrade": true, "key": "xxxxxxxxxxxxx"}**
 
 And for the confirmation indicator
 
