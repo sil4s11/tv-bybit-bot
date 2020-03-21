@@ -30,3 +30,6 @@ And for the confirmation indicator
 **{"side": "",  "canShort": true, "canLong": false, "key": "xxxxxxx"}**
 
 **{"side": "",  "canShort": false, "canLong": true, "key": "xxxxxxx"}**
+
+It works with a 1% stop loss and with limit orders and PostOnly but you can change it to market orders.
+When the price moves enough in your favor the bot moves your stop loss to break even.
