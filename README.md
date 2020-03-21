@@ -26,5 +26,6 @@ The description for the volatility indicator would be
 
 And for the confirmation indicator
 
-**{"side": "",  "canShort": true, "canLong": false, "key": "xxxxxxx"}
-{"side": "",  "canShort": false, "canLong": true, "key": "xxxxxxx"}**
+**{"side": "",  "canShort": true, "canLong": false, "key": "xxxxxxx"}**
+
+**{"side": "",  "canShort": false, "canLong": true, "key": "xxxxxxx"}**
