@@ -35,3 +35,5 @@ And for the confirmation indicator
 
 It works with a 1% stop loss and with limit orders and PostOnly but you can change it to market orders.
 When the price moves enough in your favor the bot moves your stop loss to break even.
+
+It also could be integrated with a Telegram bot so you can know the status of the bot, check your positions, and stop/start if you want.
