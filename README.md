@@ -7,6 +7,8 @@ This bot operates with the ccxt library and the Bybit API, but you can modify it
 
 It works with TradingView Webhooks so basically you have to set alarms for the indicators you want to use, you can send the alarms every minute or every candle close, and send it to your VPS or computer (using ther URL ngrok provides you), and the end poing would be /webhook so it would be http://xxx.xxx.xxx.xxx/webhook
 
+It has an interval set so each 1,2 seconds the bot will ask to the exchange to check if you have active orders or positions and based on that and with the info provided by the alarms it will do the operations.
+
 You have you fill the paramenters in the .env file with your info, the PIN_TOKEN is a random string that would be used to only allow the request that matches with the token generated.
 
 When you run the daemon for the first time it would generate a token.txt with the token you need to add in your description's alarm, so the description of your alarm should be something like this
