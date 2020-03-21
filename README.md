@@ -1,6 +1,11 @@
 # tv-bybit-bot
 Trading bot based on Trading View Webhooks
 
+For install run npm install
+---
+To run the daemon run node app
+---
+
 You can run this bot in your computer expoxing the localhost using ngrok or run it in a VPS using this [guide](https://www.digitalocean.com/community/tutorials/how-to-set-up-a-node-js-application-for-production-on-ubuntu-16-04)
 
 This bot operates with the ccxt library and the Bybit API, but you can modify it to work with other exchange.
