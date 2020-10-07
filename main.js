@@ -18,16 +18,16 @@ const symbol = 'BTCUSD'
 // Condiciones long
 let counterLong = []
 let counterShort = []
-const numConditionsLong = 1
-const numConditionsShort = 1
+const numConditionsLong = 2
+const numConditionsShort = 2
 
 // Trade
 let positionSize = parseInt(process.env.POSITION_SIZE) // Tamaño de la posición
 let stopLoss = 0 // Stop loss de la orden activa. Valor calculado a partir de variables
-let percentageStopLoss = 1
+let percentageStopLoss = 5
 let entry = 0 // Entrada orden activa
 let marginFromEntry = 12 // Lanzamos la limit order con este margen desde el precio del ticker
-let marginForBreakEven = 0 // Si se mueve lo suficiente el precio más esta cantidad movemos el stop loss a break even
+let marginForBreakEven = 300 // Si se mueve lo suficiente el precio más esta cantidad movemos el stop loss a break even
 
 // Variables position
 let positionInfo = {
@@ -56,12 +56,20 @@ let trade = {
   canTrade: false,
   canLong: false,
   canShort: false,
-  goLong: false,
-  goShort: false
+  canLongEMA: false,
+  canShortEMA: false,
+  canLongOBV: false,
+  canShortOBV: false,
+  canLongROC: false,
+  canShortROC: false
 }
 
 let status = {
   working: true
+}
+
+let server = {
+  time: 0
 }
 
 // Set the headers
@@ -76,9 +84,9 @@ let options = {
   headers: headers,
   qs: {
     api_key: apiKey,
+    sign: '', // Se rellena en cada llamada
     symbol: symbol,
     timestamp: 0, // Se rellena en cada llamada
-    sign: '' // Se rellena en cada llamada
   }
 }
 
@@ -90,6 +98,7 @@ const bybit = new ccxt.bybit({
 setInterval(async () => {
   // Asignamos el priceInfo.ticker
   try {
+    await getTime()
     // Comprobamos si tenemos posiciones
     await getPositions()
 
@@ -102,12 +111,14 @@ setInterval(async () => {
     await getActiveOrders()
     if (positionInfo.positionsOpen) return
     if (activeInfo.activeOrderSide === 'Buy') {
-      if ((priceInfo.lastPrice >= (entry + (entry - stopLoss)) || !!counterShort.length || trade.canShort)) {
+      // if ((priceInfo.lastPrice >= (entry + (entry - stopLoss)) || !!counterShort.length || trade.canShort)) {
+      if ((priceInfo.lastPrice >= (entry + (entry - stopLoss)) || !!counterShort.length)) {
         // Si tenemos activa una orden de compra y el precio llega al stop loss o hay alguna señal de venta cancelamos
         cancelActiveOrder(activeInfo.activeOrderId)
       }
     } else if (activeInfo.activeOrderSide === 'Sell') {
-      if (priceInfo.lastPrice <= (entry - (stopLoss - entry)) || !!counterLong.length || trade.canLong) {
+      // if (priceInfo.lastPrice <= (entry - (stopLoss - entry)) || !!counterLong.length || trade.canLong) {
+      if (priceInfo.lastPrice <= (entry - (stopLoss - entry)) || !!counterLong.length) {
         // Si tenemos activa una orden de venta y el precio llega al stop loss o hay alguna señal de compra cancelamos
         cancelActiveOrder(activeInfo.activeOrderId)
       }
@@ -115,37 +126,54 @@ setInterval(async () => {
   } catch (error) {
     fs.appendFile('error.log', `Error: ${error}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {});
   }
-}, 1200)
+}, 2000)
 
 let sendTelegramMessage = (text) => {
   bot.sendMessage(chatId, text)
 }
 
+let getTime = async () => {
+  let optionsUpdated = {
+    ...options,
+    url: 'https://api.bybit.com//v2/public/time',
+    method: 'GET'
+  }
+  try {
+    let response = await request(optionsUpdated)
+    server.time = parseInt(JSON.parse(response).time_now * 1000)
+    // console.log(server.time)
+  } catch (error) {
+    console.log(`Error time: ${error}`)
+  }
+}
+
 let getPositions = async () => {
-  let updatedTimestamp = (new Date().getTime())
+  // let updatedTimestamp = (new Date().getTime()) + 2000
   let qs = {...options.qs}
-  qs.timestamp = updatedTimestamp
-  qs.sign = updateSignTimestamp(updatedTimestamp)
+  qs.timestamp = server.time
+  qs.sign = updateSignTimestamp(server.time)
   let optionsUpdated = {...options, qs}
 
   try {
     let data = await request(optionsUpdated)
     let dataParsed = JSON.parse(data)
-    positionInfo.positionData = dataParsed
+    // console.log(`POSITIONS: Data parsed: ${JSON.stringify(dataParsed)}`)
+    if (dataParsed.result) {
+      positionInfo.positionData = dataParsed
 
-    if (dataParsed.result.side !== 'None') {
-      positionInfo.positionStopLoss = dataParsed.result.stop_loss
-      positionInfo.positionEntry = dataParsed.result.entry_price
-    } else {
-      // Reseteamos valores
-      positionInfo.positionStopLoss = 0
-      positionInfo.positionEntry = 0
-      positionInfo.isUpdatedPosition = false
+      if (dataParsed.result.side !== 'None') {
+        positionInfo.positionStopLoss = dataParsed.result.stop_loss
+        positionInfo.positionEntry = dataParsed.result.entry_price
+      } else {
+        // Reseteamos valores
+        positionInfo.positionStopLoss = 0
+        positionInfo.positionEntry = 0
+        positionInfo.isUpdatedPosition = false
+      }
+      // Tipo de posición que tenemos abierta
+      positionInfo.positionsOpen = dataParsed.result.side !== 'None'
+      positionInfo.positionSide = positionInfo.positionsOpen ? dataParsed.result.side : 'None'
     }
-    // Tipo de posición que tenemos abierta
-    positionInfo.positionsOpen = dataParsed.result.side !== 'None'
-    positionInfo.positionSide = positionInfo.positionsOpen ? dataParsed.result.side : 'None'
-    return new Promise(resolve => resolve({data: dataParsed}))
   } catch (error) {
     fs.appendFile('error.log', `Error (getPositions): ${error}, data: ${JSON.stringify(positionInfo)}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {});
   }
@@ -153,11 +181,11 @@ let getPositions = async () => {
 
 // Actualiza el stop loss a break even
 let updatePosition = async (stopLoss) => {
-  let updatedTimestamp = (new Date().getTime())
+  // let updatedTimestamp = (new Date().getTime())
   let qs = {...options.qs}
-  qs.timestamp = updatedTimestamp
+  qs.timestamp = server.time
   qs.stop_loss = stopLoss
-  qs.sign = updateSignUpdatePosition(stopLoss, updatedTimestamp)
+  qs.sign = updateSignUpdatePosition(stopLoss, server.time)
   let optionsUpdated = {
     ...options,
     url: 'https://api.bybit.com/open-api/position/trading-stop',
@@ -178,10 +206,10 @@ let updatePosition = async (stopLoss) => {
 }
 
 let getActiveOrders = async () => {
-  let updatedTimestamp = (new Date().getTime())
+  // let updatedTimestamp = (new Date().getTime()) + 2000
   let qs = {...options.qs}
-  qs.timestamp = updatedTimestamp
-  qs.sign = updateSignTimestamp(updatedTimestamp)
+  qs.timestamp = server.time
+  qs.sign = updateSignTimestamp(server.time)
   let optionsUpdated = {
     ...options,
     url: 'https://api.bybit.com/open-api/order/list',
@@ -190,29 +218,31 @@ let getActiveOrders = async () => {
   try {
     let data = await request(optionsUpdated)
     let dataParsed = JSON.parse(data)
-    activeInfo.isActiveOrder = dataParsed.result.data.map(d => d.order_status).some(d => d === 'New') || false
-    if (activeInfo.isActiveOrder) {
-      let activeOrder = dataParsed.result.data.find(d => d.order_status === 'New')
-      activeInfo.activeOrderId = activeOrder.order_id
-      activeInfo.activeOrderSide = activeOrder.side
-      activeInfo.activeData = activeOrder
-    } else {
-      activeInfo.activeOrderId = ''
-      activeInfo.activeOrderSide = 'None'
-      activeInfo.activeData = null
+    // console.log(`ACTIVE: Data parsed: ${JSON.stringify(dataParsed)}`)
+    if (dataParsed.result) {
+      activeInfo.isActiveOrder = dataParsed.result.data.map(d => d.order_status).some(d => d === 'New') || false
+      if (activeInfo.isActiveOrder) {
+        let activeOrder = dataParsed.result.data.find(d => d.order_status === 'New')
+        activeInfo.activeOrderId = activeOrder.order_id
+        activeInfo.activeOrderSide = activeOrder.side
+        activeInfo.activeData = activeOrder
+      } else {
+        activeInfo.activeOrderId = ''
+        activeInfo.activeOrderSide = 'None'
+        activeInfo.activeData = null
+      }
     }
-    return new Promise(resolve => resolve(dataParsed))
   } catch (error) {
     fs.appendFile('error.log', `Error (getActiveOrders) ${error}, data: ${JSON.stringify(activeInfo)}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {})
   }
 }
 
 let cancelActiveOrder = async (activeId) => {
-  let updatedTimestamp = (new Date().getTime())
+  // let updatedTimestamp = (new Date().getTime())
   let qs = {...options.qs}
-  qs.timestamp = updatedTimestamp
+  qs.timestamp = server.time
   qs.order_id = activeId
-  qs.sign = updateSignActive(activeId, updatedTimestamp)
+  qs.sign = updateSignActive(activeId, server.time)
   let optionsUpdated = {
     ...options,
     url: 'https://api.bybit.com/v2/private/order/cancel',
@@ -258,9 +288,22 @@ const updateSignTimestamp = (timestamp) => {
 
 const handleHook = async (info) => {
   let side = info.side
-  trade.canTrade = info.hasOwnProperty('canTrade') ? JSON.parse(info.canTrade) : trade.canTrade
-  trade.canLong = info.hasOwnProperty('canLong') ? JSON.parse(info.canLong) : trade.canLong
-  trade.canShort = info.hasOwnProperty('canShort') ? JSON.parse(info.canShort) : trade.canShort
+  // Utilizamos solo DMI y EMAS
+  // trade.canTrade = info.hasOwnProperty('canTrade') ? JSON.parse(info.canTrade) : trade.canTrade
+  trade.canTrade = true
+  // trade.canLong = true
+  // trade.canShort = true
+  trade.canLongEMA = info.hasOwnProperty('canLongEMA') ? JSON.parse(info.canLongEMA) : trade.canLongEMA
+  trade.canLongOBV = info.hasOwnProperty('canLongOBV') ? JSON.parse(info.canLongOBV) : trade.canLongOBV
+  trade.canLongROC = info.hasOwnProperty('canLongROC') ? JSON.parse(info.canLongROC) : trade.canLongROC
+  trade.canLong = trade.canLongEMA && trade.canLongOBV && trade.canLongROC
+
+  trade.canShortEMA = info.hasOwnProperty('canShortEMA') ? JSON.parse(info.canShortEMA) : trade.canShortEMA
+  trade.canShortOBV = info.hasOwnProperty('canShortOBV') ? JSON.parse(info.canShortOBV) : trade.canShortOBV
+  trade.canShortROC = info.hasOwnProperty('canShortROC') ? JSON.parse(info.canShortROC) : trade.canShortROC
+  trade.canShort = trade.canShortEMA && trade.canShortOBV && trade.canShortROC
+  // trade.canLong = info.hasOwnProperty('canLong') ? JSON.parse(info.canLong) : trade.canLong
+  // trade.canShort = info.hasOwnProperty('canShort') ? JSON.parse(info.canShort) : trade.canShort
 
   /******* Gestión de alertas *******/
   // Si es condición de compra pero no está incluida en el array la incluimos
@@ -345,17 +388,18 @@ const handleHook = async (info) => {
 
       try {
         let dataOrder = await bybit.createOrder('BTC/USD', 'limit', 'buy', positionSize, entry, {'time_in_force': 'PostOnly', stop_loss: stopLoss})
+        // let dataOrder = await bybit.createOrder('BTC/USD', 'market', 'buy', positionSize, undefined, {'time_in_force': 'GoodTillCancel', stop_loss: stopLoss})
         activeInfo.activeOrderId = dataOrder.info.order_id
         activeInfo.activeOrderSide = dataOrder.info.side // 'Buy'
         activeInfo.isActiveOrder = true
-        fs.appendFile('entries.log', `Long => Entrada: ${entry}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}\n`, function (err) {})
+        fs.appendFile('entries.log', `Long => Entrada: ${priceInfo.lastPrice}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}\n`, function (err) {})
         if (hasBot) {
-          sendTelegramMessage(`Long => Entrada: ${entry}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}`)
+          sendTelegramMessage(`Long => Entrada: ${priceInfo.lastPrice}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}`)
         }
 
         // Reseteamos los contadores, solo tenemos en cuenta señales contratias a partir desde que entramos
-        counterLong.length = 0
-        counterShort.length = 0
+        // counterLong.length = 0
+        // counterShort.length = 0
       } catch (error) {
         fs.appendFile('error.log', `Error: ${error}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {});
       }
@@ -366,17 +410,18 @@ const handleHook = async (info) => {
 
       try {
         let dataOrder = await bybit.createOrder('BTC/USD', 'limit', 'sell', positionSize, entry, {'time_in_force': 'PostOnly', stop_loss: stopLoss})
+        // let dataOrder = await bybit.createOrder('BTC/USD', 'market', 'sell', positionSize, undefined, {'time_in_force': 'GoodTillCancel', stop_loss: stopLoss})
         activeInfo.activeOrderId = dataOrder.info.order_id
         activeInfo.activeOrderSide = dataOrder.info.side // 'Sell'
         activeInfo.isActiveOrder = true
-        fs.appendFile('entries.log', `Short => Entrada: ${entry}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}\n`, function (err) {})
+        fs.appendFile('entries.log', `Short => Entrada: ${priceInfo.lastPrice}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}\n`, function (err) {})
         if (hasBot) {
-          sendTelegramMessage(`Short => Entrada: ${entry}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}`)
+          sendTelegramMessage(`Short => Entrada: ${priceInfo.lastPrice}, Slop Loss: ${stopLoss}, Fecha: ${new Date().toLocaleString()}`)
         }
 
         // Reseteamos los contadores, solo tenemos en cuenta señales contratias a partir desde que entramos
-        counterLong.length = 0
-        counterShort.length = 0
+        // counterLong.length = 0
+        // counterShort.length = 0
       } catch (error) {
         fs.appendFile('error.log', `Error: ${error}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {});
       }

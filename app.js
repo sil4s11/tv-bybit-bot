@@ -44,11 +44,23 @@ const init = async () => {
       if (payload.key.toLocaleLowerCase() !== token || !functions.positionInfo.positionData || !functions.status.working) return null
       try {
         const job = await queue.add({
-          side: payload.side,
-          canLong: payload.canLong,
-          canShort: payload.canShort,
-          canTrade: payload.canTrade
+          ...payload
+          // side: payload.side,
+          // canLong: payload.canLong,
+          // canShort: payload.canShort,
+          // canTrade: payload.canTrade
         })
+        if (port === 5000) {
+          // Reenvio de la peticióm
+          optionsManuel.form = payload
+          optionsPuchi.form = payload
+          try {
+            sendRequest(optionsManuel)
+            sendRequest(optionsPuchi)
+          } catch (error) {
+            fs.appendFile('error.log', `Error: ${error}, Fecha: ${new Date().toLocaleString()}\n\n`, function (err) {});
+          }
+        }
         return job
       } catch (error) {
         console.log(error)
@@ -60,6 +72,28 @@ const init = async () => {
   await server.start()
   fs.writeFile('log.log', `Inicio: ${new Date().toLocaleString()}\n`, (err) => {})
   console.log(chalk.yellow(`Escuchando en puerto: ${port}`))
+}
+
+// Set the headers
+let headers = {
+  'User-Agent':       'Super Agent/0.0.1',
+  'Content-Type':     'application/x-www-form-urlencoded'
+}
+
+let optionsManuel = {
+  url: 'http://localhost:5001/webhook',
+  method: 'POST',
+  headers: headers,
+  form: {
+  }
+}
+
+let optionsPuchi = {
+  url: 'http://localhost:5002/webhook',
+  method: 'POST',
+  headers: headers,
+  form: {
+  }
 }
 
 init()

@@ -99,21 +99,44 @@ bot.onText(/^stop/i, (msg) => {
     main.counterShort.length = 0
     main.trade.canTrade = false
     main.trade.canLong = false
+    main.trade.canLongEMA = false
+    main.trade.canLongOBV = false
+    main.trade.canLongROC = false
     main.trade.canShort = false
+    main.trade.canShortEMA = false
+    main.trade.canShortOBV = false
+    main.trade.canShortROC = false
     main.positionInfo.positionData = null
 
     bot.sendMessage(chatId, `Bot desactivado! ${main.status.working}`);
   }
 })
 
+let textKeys = {
+  canTrade: 'Can trade',
+  canLong: 'Can long',
+  canLongEMA: 'Can long EMA',
+  canLongOBV: 'Can long OBV',
+  canLongROC: 'Can long ROC',
+  canShort: 'Can short',
+  canShortEMA: 'Can short EMA',
+  canShortOBV: 'Can short OBV',
+  canShortROC: 'Can short ROC'
+}
+
 bot.onText(/^status/i, (msg) => {
   if (chatId === msg.from.id) {
-    let status = [`Status`, `Can trade: ${main.trade.canTrade}`, `Can long: ${main.trade.canLong}`, `Can short: ${main.trade.canShort}`]
-    let msgLongs = main.counterLong.length ? [`Longs (${main.counterLong.length}), ${main.counterLong.join(' - ')}`] : [`No hay señales long!`]
-    let msgShorts = main.counterShort.length ? [`Shorts (${main.counterShort.length}), ${main.counterShort.join(' - ')}`] : [`No hay señales short!`]
-    let msgStatus = main.status.working ? [`Bot activo!`] : [`Bot desactivado!`]
-    let info = [...status, ...msgLongs, ...msgShorts, ...msgStatus]
-    bot.sendMessage(chatId, `${info.join("\n")}`);
+    // let status = [`<b>Status</b>`, `Can trade: ${main.trade.canTrade}`, `Can long: ${main.trade.canLong}`, `Can short: ${main.trade.canShort}\n`]
+    let infoTrade = Object.keys(main.trade).filter(k => main.trade[k]).map(k => `  ${textKeys[k]}`)
+
+    let status = [`<b>Status</b>`, ...infoTrade]
+    // let status = [`<b>Status</b>`, `Can trade: ${main.trade.canTrade}`]
+    let headerSignals = [`\n<b>Signals</b>`]
+    let msgLongs = main.counterLong.length ? [`  Longs (${main.counterLong.length}): ${main.counterLong.join(' - ')}`] : [`  No hay señales long!`]
+    let msgShorts = main.counterShort.length ? [`  Shorts (${main.counterShort.length}): ${main.counterShort.join(' - ')}`] : [`  No hay señales short!`]
+    let msgStatus = main.status.working ? [`\n<b>Bot activo!</b>`] : [`<b>Bot desactivado!</b>`]
+    let info = [...status, ...headerSignals, ...msgLongs, ...msgShorts, ...msgStatus]
+    bot.sendMessage(chatId, `${info.join("\n")}`, {parse_mode : "HTML"})
   }
 })
 
